@@ -182,7 +182,6 @@ def optimize(dh, joint_list, xyz_list, lr):
     dh_mask = (torch.tensor(dh_true, dtype=torch.float32, device=device) != 0).float()
     dh_params_raw = torch.tensor(dh, dtype=torch.float32, device=device, requires_grad=True)
     p3 = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=device, requires_grad=True)
-    # omega = torch.zeros(3, dtype=torch.float32, device=device, requires_grad=True)
     omega = (torch.tensor([0.1, 0.1, 0.1]) * np.pi / 180).to(device).detach().clone().requires_grad_(True)
     dh_init = (dh_mask * dh_params_raw + (1 - dh_mask) * torch.tensor(dh_true, dtype=torch.float32, device=device)).detach().cpu().numpy().copy()
     p3_init = p3.detach().cpu().numpy().copy()
@@ -196,8 +195,8 @@ def optimize(dh, joint_list, xyz_list, lr):
         optimizer1.step()
         print(f"[omega + p3] Epoch {epoch}: Loss={loss.detach().item():.10f}", end='\r', flush=True)
 
-    print("omega_est (deg):", np.degrees(omega.detach().cpu().numpy()))
-    print(p3.detach().cpu().numpy())
+    print("\nomega_est (deg):", np.degrees(omega.detach().cpu().numpy()))
+    print(f"\r{p3.detach().cpu().numpy()}")
 
     print("\nomega + mdh + p3...")
     optimizer2 = torch.optim.Adam([dh_params_raw, p3, omega], lr=lr)
