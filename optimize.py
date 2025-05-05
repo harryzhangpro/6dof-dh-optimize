@@ -195,7 +195,7 @@ def optimize(dh, joint_list, xyz_list, lr, mask=False):
     dh_init = (dh_mask * dh_params_raw + (1 - dh_mask) * torch.tensor(dh_true, dtype=torch.float32, device=device)).detach().cpu().numpy().copy()
     p3_init = p3.detach().cpu().numpy().copy()
     print("\nomega + p3...")
-    optimizer1 = torch.optim.Adam([omega, p3], lr=1e-1)
+    optimizer1 = torch.optim.Adam([omega, p3], lr=1e-2)
     for epoch in range(2000):
         optimizer1.zero_grad()
         dh_params = dh_mask * dh_params_raw + (1 - dh_mask) * torch.tensor(dh_true, dtype=torch.float32, device=device)
@@ -227,7 +227,8 @@ def optimize(dh, joint_list, xyz_list, lr, mask=False):
         loss.backward()
         optimizer2.step()
         print(f"[all Joint] Epoch {epoch}: Loss={loss.detach().item():.10f}", end='\r', flush=True)
-
+    print("\r")
+    
     dh_final = (dh_mask * dh_params_raw + (1 - dh_mask) * torch.tensor(dh_true, dtype=torch.float32, device=device)).detach().cpu().numpy()
     p3_final = p3.detach().cpu().numpy()
     omega_final = omega.detach().cpu().numpy()
@@ -392,7 +393,7 @@ def run_true(aubo_txt_path, laser_csv_path):
                                   torch.tensor(dh_true, dtype=torch.float32, device=device),
                                   num_points=10)
 
-    dh_final, p3_final, dh_init, p3_init, omega = optimize(dh_true, joint_list, xyz_list, 1e-3)
+    dh_final, p3_final, dh_init, p3_init, omega = optimize(dh_true, joint_list, xyz_list, 5e-4)
 
     # 保存优化后的 DH 参数为 dh.txt
     with open('dh.txt', 'w') as f:
