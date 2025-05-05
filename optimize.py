@@ -177,10 +177,19 @@ def compute_loss_batch(dh_params, p3, omega, joint_list, xyz_list, neighbor_pair
 
     return loss
 
-def optimize(dh, joint_list, xyz_list, lr):
+def optimize(dh, joint_list, xyz_list, lr, mask=False):
     pairs = [(i, i+1) for i in range(len(joint_list)-1)]
-    dh_mask = (torch.tensor(dh_true, dtype=torch.float32, device=device) != 0).float()
-    dh_params_raw = torch.tensor(dh, dtype=torch.float32, device=device, requires_grad=True)
+
+    if mask:
+        dh_mask = (torch.tensor(dh_true, dtype=torch.float32, device=device) != 0).float()
+        dh_params_raw = torch.tensor(dh, dtype=torch.float32, device=device, requires_grad=True)
+    else:
+        dh_mask = torch.ones_like(torch.tensor(dh_true, dtype=torch.float32, device=device))
+        dh_params_raw = torch.tensor(dh, dtype=torch.float32, device=device, requires_grad=True)
+
+    p3 = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=device, requires_grad=True)
+    omega = (torch.tensor([0.1, 0.1, 0.1]) * np.pi / 180).to(device).detach().clone().requires_grad_(True)
+
     p3 = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=device, requires_grad=True)
     omega = (torch.tensor([0.1, 0.1, 0.1]) * np.pi / 180).to(device).detach().clone().requires_grad_(True)
     dh_init = (dh_mask * dh_params_raw + (1 - dh_mask) * torch.tensor(dh_true, dtype=torch.float32, device=device)).detach().cpu().numpy().copy()
@@ -198,7 +207,7 @@ def optimize(dh, joint_list, xyz_list, lr):
     print("\nomega_est (deg):", np.degrees(omega.detach().cpu().numpy()))
     print(f"\r{p3.detach().cpu().numpy()}")
 
-    print("\nomega + mdh + p3...")
+    print("\nomega + dh + p3...")
     optimizer2 = torch.optim.Adam([dh_params_raw, p3, omega], lr=lr)
     for axis in range(6):
         for epoch in range(1000):
@@ -358,29 +367,6 @@ def visualize_arm_and_laser_points(joint_list, xyz_list, dh_params, num_points=1
     plt.tight_layout()
     plt.show()
 
-def mirror_pose_data(xyz_array: np.ndarray, mode: str = 'x') -> np.ndarray:
-    """
-    对 xyz 数据做镜像变换：
-    - mode = 'x'：沿 x 轴镜像（x → -x）
-    - mode = 'y'：沿 y 轴镜像
-    - mode = 'z'：沿 z 轴镜像
-    - mode = 'xyz': 同时镜像所有轴
-
-    Returns: 镜像后的 xyz_array
-    """
-    mirrored = xyz_array.copy()
-    if mode == 'x':
-        mirrored[:, 0] *= -1
-    elif mode == 'y':
-        mirrored[:, 1] *= -1
-    elif mode == 'z':
-        mirrored[:, 2] *= -1
-    elif mode == 'xyz':
-        mirrored *= -1
-    else:
-        raise ValueError(f"不支持的镜像模式: {mode}")
-    return mirrored
-
 def run_sim(mode="single"):
     joint_list, xyz_list = generate_data_batch(mode=mode, steps=20, N_multi= 120)
 
@@ -406,8 +392,16 @@ def run_true(aubo_txt_path, laser_csv_path):
                                   torch.tensor(dh_true, dtype=torch.float32, device=device),
                                   num_points=10)
 
-    # xyz_list = mirror_pose_data(xyz_list, 'z')
     dh_final, p3_final, dh_init, p3_init, omega = optimize(dh_true, joint_list, xyz_list, 1e-3)
+
+    # 保存优化后的 DH 参数为 dh.txt
+    with open('dh.txt', 'w') as f:
+        f.write('dh_params = np.array([')
+        for i, row in enumerate(dh_final):
+            f.write('[' + ', '.join(f'{x:.8f}' for x in row) + ']')
+            if i < len(dh_final) - 1:
+                f.write(',\n                        ')
+        f.write('])\n')
 
     print(dh_init)
     print(dh_final)
